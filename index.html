@@ -293,8 +293,8 @@ function getColorFromDbm(dbm) {
   if (dbm === null || dbm === undefined || Number.isNaN(dbm)) {
     return "#888888";
   }
-  const min = -120;  // 최소 dBm (필요시 조정)
-  const max = -30;   // 최대 dBm
+  const min = -55;  // 최소 dBm (필요시 조정)
+  const max = 0;   // 최대 dBm
   const clamped = Math.max(min, Math.min(max, dbm));
   const ratio = (clamped - min) / (max - min); // 0 ~ 1
 
@@ -359,7 +359,7 @@ function renderMapFromRows(rows) {
     const color = getColorFromDbm(p.Total_CH_power_dBm);
 
     L.circleMarker(latlng, {
-      radius: 6,
+      radius: 5,
       color: color,
       fillColor: color,
       fillOpacity: 0.7,
@@ -528,4 +528,5 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
