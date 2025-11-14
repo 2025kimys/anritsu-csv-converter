@@ -115,6 +115,31 @@
       border-radius: 8px;
       margin-top: 1rem;
     }
+    .legend {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      margin-top: 0.3rem;
+    }
+
+    .legend-bar {
+      width: 200px;
+      height: 8px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+      /* getColorFromDbm과 맞춘 그라데이션: 초록 → 노랑 → 빨강 */
+      background: linear-gradient(to right,
+        rgb(0, 255, 0),
+        rgb(255, 255, 0),
+        rgb(255, 0, 0)
+      );
+    }
+
+    .legend-label {
+      font-size: 0.8rem;
+      color: #555;
+    }
+
   </style>
 </head>
 
@@ -154,10 +179,14 @@
     <div id="mapSection" style="display:none; margin-top:1rem;">
       <div class="small"><b>GPS 기반 이동 경로 지도</b></div>
       <div id="map"></div>
-      <div class="small muted" style="margin-top:0.3rem;">
-        색상: 약한 신호(초록) → 강한 신호(빨강). 점을 클릭하면 dBm / 시간 / 파일명을 볼 수 있습니다.
+      <div class="legend">
+        <span class="legend-label">-120 dBm (약한 신호)</span>
+        <div class="legend-bar"></div>
+        <span class="legend-label">-30 dBm (강한 신호)</span>
       </div>
-    </div>
+      <div class="small muted">
+        점을 클릭하면 해당 위치의 dBm / 시간 / 파일명을 볼 수 있습니다.
+      </div>
   </div>
 
 <script>
@@ -528,5 +557,6 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
 
