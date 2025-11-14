@@ -2,7 +2,20 @@
 <html lang="ko">
 <head>
   <meta charset="UTF-8" />
-  <title>안리츠 장비 CSV 변환 프로그램</title>
+  <title>안리츠 장비 CSV 변환기</title>
+
+  <!-- Leaflet CSS -->
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    crossorigin=""
+  />
+  <!-- Leaflet JS -->
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    crossorigin=""
+  ></script>
+
   <style>
     body {
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
@@ -20,7 +33,6 @@
     }
     .section h2 {
       margin-top: 0;
-      font-size: 1.05rem;
     }
     .btn {
       display: inline-block;
@@ -39,21 +51,18 @@
       background-color: #6c757d;
       color: white;
     }
-    .btn:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    #map {
+      height: 420px;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      margin-top: 1rem;
     }
     .small {
       font-size: 0.85rem;
-      color: #555;
     }
-    .file-list {
-      margin-top: 0.5rem;
-      padding-left: 1.2rem;
-      font-size: 0.9rem;
-    }
-    .file-list li {
-      margin-bottom: 0.15rem;
+    .muted {
+      color: #777;
+      font-size: 0.85rem;
     }
     table {
       border-collapse: collapse;
@@ -63,454 +72,354 @@
     th, td {
       border: 1px solid #ddd;
       padding: 4px 6px;
-      text-align: left;
-      max-width: 200px;
+      white-space: nowrap;
       overflow: hidden;
       text-overflow: ellipsis;
-      white-space: nowrap;
     }
     thead {
       background-color: #f5f5f5;
     }
     .expander {
-      margin-top: 0.5rem;
       border: 1px solid #ddd;
       border-radius: 4px;
+      margin-top: 0.5rem;
     }
     .expander-header {
-      padding: 0.3rem 0.6rem;
-      background-color: #f8f9fa;
+      background: #f7f7f7;
+      padding: 0.4rem;
       cursor: pointer;
       display: flex;
       justify-content: space-between;
-      align-items: center;
-      font-size: 0.9rem;
     }
     .expander-body {
-      padding: 0.6rem;
       display: none;
-      background-color: #fff;
+      padding: 0.6rem;
     }
     .badge {
-      display: inline-block;
+      background: #e7e7e7;
       padding: 0.1rem 0.35rem;
-      font-size: 0.7rem;
       border-radius: 4px;
-      background-color: #e9ecef;
-      margin-left: 0.4rem;
-    }
-    .status {
-      margin-top: 0.5rem;
-      font-size: 0.9rem;
-    }
-    .status span.ok {
-      color: #1f7a1f;
-    }
-    .status span.err {
-      color: #b81d1d;
-    }
-    .muted {
-      color: #888;
-      font-size: 0.85rem;
+      font-size: 0.7rem;
     }
   </style>
 </head>
+
 <body>
-  <h1>안리츠 장비 CSV 변환 프로그램</h1>
-  <div class="small">
-    여러 개의 계측 CSV 파일을 업로드하면,<br />
-    각 파일에 대해 총 채널 파워(dBm)를 계산하고 요약 CSV를 생성한 뒤,
-    개별/통합 CSV로 다운로드할 수 있습니다.<br />
-    (모든 처리는 브라우저 안에서만 수행되며 서버로 업로드되지 않습니다.)
+
+  <h1>안리츠 장비 CSV 변환기</h1>
+  <div class="small muted">
+    여러 CSV 파일을 업로드하여 총 채널 파워(dBm)를 계산하고 지도/CSV로 시각화합니다.
+    (모든 처리는 브라우저 내부에서만 실행됨)
   </div>
 
-  <!-- 업로드 및 옵션 섹션 -->
+  <!-- 1. 파일 업로드 -->
   <div class="section">
     <h2>1. CSV 파일 업로드</h2>
     <input id="fileInput" type="file" accept=".csv" multiple />
-    <div class="small muted">
-      Ctrl / Shift 키를 이용해 여러 파일을 한 번에 선택할 수 있습니다.
-    </div>
+    <div id="fileInfo" class="small"></div>
+    <ul id="fileList" class="small"></ul>
 
-    <div id="fileInfo" class="status"></div>
-    <ul id="fileList" class="file-list"></ul>
-
-    <div style="margin-top:1rem;">
-      <button id="convertButton" class="btn btn-primary" disabled>모든 파일 변환 실행</button>
-      <span id="convertStatus" class="status"></span>
-    </div>
+    <button id="convertButton" class="btn btn-primary" disabled>
+      모든 파일 변환 실행
+    </button>
+    <div id="convertStatus" class="small"></div>
   </div>
 
-  <!-- 변환 결과: 파일별 -->
+  <!-- 2. 개별 결과 -->
   <div class="section">
     <h2>2. 파일별 변환 결과</h2>
-    <div id="perFileResults" class="small muted">
-      아직 변환 결과가 없습니다. 위에서 파일을 선택하고 "모든 파일 변환 실행"을 누르세요.
-    </div>
+    <div id="perFileResults" class="muted">아직 변환 결과 없음</div>
   </div>
 
-  <!-- 변환 결과: 통합 -->
+  <!-- 3. 통합 결과 -->
   <div class="section">
     <h2>3. 모든 파일 통합 결과</h2>
-    <div id="mergedResult" class="small muted">
-      아직 통합 결과가 없습니다.
+    <div id="mergedResult" class="muted">아직 데이터 없음</div>
+
+    <!-- 지도 영역 -->
+    <div id="mapSection" style="display:none; margin-top:1rem;">
+      <div class="small"><b>GPS 기반 이동 경로 지도</b></div>
+      <div id="map"></div>
     </div>
   </div>
 
-  <script>
-    // =========================
-    // 1) 파이썬 로직 포팅 (JS)
-    // =========================
+<script>
+/* -------------------------
+   파이썬 로직 → JS 변환
+--------------------------*/
 
-    // compute_total_ch_dbm(dbm_values)
-    // - dBm 리스트 -> mW로 변환 -> 합산 -> 다시 dBm
-    function computeTotalChDbm(dbmValues) {
-      if (!dbmValues || dbmValues.length === 0) {
-        return NaN;
-      }
-      const lin = dbmValues
-        .filter(v => v !== null && !Number.isNaN(v))
-        .map(v => Math.pow(10, v / 10.0));
+function computeTotalChDbm(vals) {
+  const mw = vals
+    .filter(v => v !== null && !isNaN(v))
+    .map(v => Math.pow(10, v / 10));
+  if (!mw.length) return NaN;
+  const sum = mw.reduce((a,b)=>a+b,0);
+  return 10 * Math.log10(sum);
+}
 
-      if (!lin.length) {
-        return NaN;
-      }
-      const sum = lin.reduce((a, b) => a + b, 0);
-      if (sum <= 0) {
-        return NaN;
-      }
-      return 10 * Math.log10(sum);
-    }
+function parseFileMakeSummary(csvText, fname) {
+  let lines = csvText.split(/\r?\n/).map(s => s.trim()).filter(s => s.length > 0);
+  if (lines.length <= 19) return [];
+  const dataLines = lines.slice(19);
+  const tokens = dataLines.map(r => r.split(","));
+  if (!tokens.length) return [];
 
-    // parse_file_make_summary(csv_text, filename)
-    // - 파이썬 버전 구조를 그대로 따라감:
-    //   1) 앞쪽 헤더 라인 스킵 (기본 19줄)
-    //   2) 콤마로 split
-    //   3) 컬럼 개수 mode를 가진 행들만 사용
-    //   4) 상위 2행은 헤더로 보고 그 이후부터 데이터
-    //   5) wr[1]=DateTime, wr[2]=Longitude, wr[3]=Latitude
-    //   6) wr[5:-1] 부분을 채널 파워(dBm)로 보고 총전력 계산
-    //   7) JS에서는 __source_file__ 컬럼도 같이 붙여서 반환
-    function parseFileMakeSummary(csvText, filename) {
-      // 줄 단위 분리
-      let lines = csvText.split(/\r?\n/);
-      lines = lines.map(ln => ln.replace(/\r/g, "")).filter(ln => ln.trim().length > 0);
+  const freq = {};
+  tokens.forEach(t => freq[t.length] = (freq[t.length] || 0) + 1);
+  const mode = Object.entries(freq).sort((a,b)=>b[1]-a[1])[0][0];
+  const wide = tokens.filter(t => t.length == mode);
+  if (wide.length < 3) return [];
 
-      if (lines.length <= 19) {
-        return [];
-      }
+  const out = [];
 
-      // 헤더 스킵 (19줄)
-      const dataLines = lines.slice(19);
+  for (let i=2; i < wide.length; i++) {
+    const wr = wide[i];
+    const idx = parseInt(wr[0]);
+    if (isNaN(idx)) continue;
 
-      // 간단한 CSV split (따옴표 처리 X) -> 파이썬 코드도 r.split(",") 구조였으므로 일관성 유지
-      const tokens = dataLines.map(r => r.split(","));
-      if (!tokens.length) {
-        return [];
-      }
+    const dt = wr[1] || "";
+    const lon = parseFloat(wr[2]);
+    const lat = parseFloat(wr[3]);
 
-      // 각 행의 컬럼 개수 빈도 -> 최빈값 (mode)
-      const lengthCount = {};
-      tokens.forEach(t => {
-        const n = t.length;
-        lengthCount[n] = (lengthCount[n] || 0) + 1;
-      });
-
-      const lengthEntries = Object.entries(lengthCount).sort((a, b) => b[1] - a[1]);
-      const ncolsMode = lengthEntries.length ? parseInt(lengthEntries[0][0], 10) : null;
-      if (!ncolsMode) {
-        return [];
-      }
-
-      const wideRows = tokens.filter(t => t.length === ncolsMode);
-      if (wideRows.length < 3) {
-        return [];
-      }
-
-      const out = [];
-
-      // 인덱스 2부터: 상위 2행은 헤더/메타로 보고 건너뜀
-      for (let i = 2; i < wideRows.length; i++) {
-        const wr = wideRows[i];
-
-        // wr[0]: index 같은 숫자
-        let idx = parseInt(wr[0], 10);
-        if (Number.isNaN(idx)) {
-          // 파이썬 코드도 try: int(wr[0]) 실패시 continue 하는 구조
-          continue;
-        }
-
-        const dt = wr.length > 1 ? wr[1] : "";
-        let lon = NaN;
-        let lat = NaN;
-        if (wr.length > 2 && wr[2].trim() !== "") {
-          const v = parseFloat(wr[2]);
-          lon = Number.isNaN(v) ? NaN : v;
-        }
-        if (wr.length > 3 && wr[3].trim() !== "") {
-          const v = parseFloat(wr[3]);
-          lat = Number.isNaN(v) ? NaN : v;
-        }
-
-        // wr[5:-1] -> wr[5]부터 마지막-1까지
-        const valsTokens = wr.length > 6 ? wr.slice(5, wr.length - 1) : [];
-        const vals = valsTokens.map(x => {
-          if (x.trim() === "") return NaN;
-          const v = parseFloat(x);
-          return Number.isNaN(v) ? NaN : v;
-        });
-
-        const totalDbm = valsTokens.length ? computeTotalChDbm(vals) : NaN;
-
-        out.push({
-          DateTime: dt,
-          Longitude: lon,
-          Latitude: lat,
-          Total_CH_power_dBm: totalDbm,
-          __source_file__: filename
-        });
-      }
-
-      return out;
-    }
-
-    // rows -> CSV 문자열 (고정 헤더 사용)
-    function rowsToCsv(rows) {
-      if (!rows || !rows.length) {
-        return "";
-      }
-      const headers = ["DateTime", "Longitude", "Latitude", "Total_CH_power_dBm", "__source_file__"];
-      const lines = [];
-      lines.push(headers.join(","));
-      for (const row of rows) {
-        const vals = headers.map(h => {
-          const v = row[h];
-          if (v === null || v === undefined || Number.isNaN(v)) {
-            return "";
-          }
-          // CSV 단순 처리: 콤마가 들어올 일이 거의 없다고 가정
-          return String(v);
-        });
-        lines.push(vals.join(","));
-      }
-      return lines.join("\r\n");
-    }
-
-    // 테이블 렌더링 (상위 N행만)
-    function renderTable(container, rows, maxRows = 50) {
-      container.innerHTML = "";
-      if (!rows || !rows.length) {
-        container.textContent = "표시할 데이터가 없습니다.";
-        return;
-      }
-      const headers = ["DateTime", "Longitude", "Latitude", "Total_CH_power_dBm", "__source_file__"];
-      const table = document.createElement("table");
-      const thead = document.createElement("thead");
-      const headTr = document.createElement("tr");
-      headers.forEach(h => {
-        const th = document.createElement("th");
-        th.textContent = h;
-        headTr.appendChild(th);
-      });
-      thead.appendChild(headTr);
-      table.appendChild(thead);
-
-      const tbody = document.createElement("tbody");
-      const n = Math.min(maxRows, rows.length);
-      for (let i = 0; i < n; i++) {
-        const r = rows[i];
-        const tr = document.createElement("tr");
-        headers.forEach(h => {
-          const td = document.createElement("td");
-          const v = r[h];
-          if (v === null || v === undefined || Number.isNaN(v)) {
-            td.textContent = "";
-          } else {
-            td.textContent = String(v);
-          }
-          tr.appendChild(td);
-        });
-        tbody.appendChild(tr);
-      }
-      table.appendChild(tbody);
-
-      container.appendChild(table);
-    }
-
-    // CSV 다운로드
-    function downloadCsv(filename, csvText) {
-      const blob = new Blob([csvText], { type: "text/csv;charset=utf-8;" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-    }
-
-    // 간단한 expander
-    function createExpander(titleText, badgeText) {
-      const wrapper = document.createElement("div");
-      wrapper.className = "expander";
-
-      const header = document.createElement("div");
-      header.className = "expander-header";
-      const titleSpan = document.createElement("span");
-      titleSpan.textContent = titleText;
-      const badgeSpan = document.createElement("span");
-      badgeSpan.className = "badge";
-      badgeSpan.textContent = badgeText || "";
-      header.appendChild(titleSpan);
-      header.appendChild(badgeSpan);
-
-      const body = document.createElement("div");
-      body.className = "expander-body";
-
-      header.addEventListener("click", () => {
-        const isVisible = body.style.display === "block";
-        body.style.display = isVisible ? "none" : "block";
-      });
-
-      wrapper.appendChild(header);
-      wrapper.appendChild(body);
-      return { wrapper, body };
-    }
-
-    // =========================
-    // 2) UI 로직
-    // =========================
-
-    const fileInput = document.getElementById("fileInput");
-    const fileInfo = document.getElementById("fileInfo");
-    const fileList = document.getElementById("fileList");
-    const firstPreviewSection = document.getElementById("firstPreviewSection");
-    const firstPreview = document.getElementById("firstPreview");
-    const convertButton = document.getElementById("convertButton");
-    const convertStatus = document.getElementById("convertStatus");
-    const perFileResults = document.getElementById("perFileResults");
-    const mergedResult = document.getElementById("mergedResult");
-
-    let selectedFiles = [];
-
-    fileInput.addEventListener("change", () => {
-      selectedFiles = Array.from(fileInput.files || []);
-      fileList.innerHTML = "";
-      convertStatus.textContent = "";
-      perFileResults.textContent = "아직 변환 결과가 없습니다. 위에서 파일을 선택하고 \"모든 파일 변환 실행\"을 누르세요.";
-      mergedResult.textContent = "아직 통합 결과가 없습니다.";
-
-      if (!selectedFiles.length) {
-        fileInfo.innerHTML = "<span class='err'>선택된 파일이 없습니다.</span>";
-        convertButton.disabled = true;
-        return;
-      }
-
-      fileInfo.innerHTML = `<span class="ok">업로드된 파일 개수: ${selectedFiles.length}개</span>`;
-      selectedFiles.forEach(f => {
-        const li = document.createElement("li");
-        li.textContent = `${f.name} (${(f.size / (1024 * 1024)).toFixed(2)} MB)`;
-        fileList.appendChild(li);
-      });
-
-      convertButton.disabled = false;
+    const values = wr.slice(5, wr.length - 1).map(x => {
+      const v = parseFloat(x);
+      return isNaN(v) ? NaN : v;
     });
 
-    convertButton.addEventListener("click", async () => {
-      if (!selectedFiles.length) {
-        alert("먼저 CSV 파일을 선택하세요.");
-        return;
-      }
+    const total = computeTotalChDbm(values);
 
-      convertButton.disabled = true;
-      convertStatus.innerHTML = "<span class='ok'>변환 중입니다...</span>";
-      perFileResults.innerHTML = "";
-      mergedResult.innerHTML = "";
-
-      const allRows = [];
-      const perFileRows = [];
-
-      for (const file of selectedFiles) {
-        try {
-          const text = await file.text();
-          const rows = parseFileMakeSummary(text, file.name);
-          perFileRows.push({ file, rows });
-          allRows.push(...rows);
-        } catch (e) {
-          const p = document.createElement("p");
-          p.innerHTML = `<span class="err">${file.name} 변환 중 오류: ${e}</span>`;
-          perFileResults.appendChild(p);
-        }
-      }
-
-      // 파일별 결과 렌더링
-      if (!perFileRows.length) {
-        perFileResults.innerHTML = "<span class='err'>변환 결과가 없습니다. 파일 포맷을 확인하세요.</span>";
-      } else {
-        perFileResults.innerHTML = "";
-        perFileRows.forEach(({ file, rows }) => {
-          const infoText = rows.length ? `행 수: ${rows.length}` : "데이터 없음";
-          const { wrapper, body } = createExpander(
-            `변환 결과: ${file.name}`,
-            infoText
-          );
-
-          const tableContainer = document.createElement("div");
-          renderTable(tableContainer, rows, 50);
-          body.appendChild(tableContainer);
-
-          const btn = document.createElement("button");
-          btn.className = "btn btn-secondary";
-          btn.textContent = `${file.name} 결과 CSV 다운로드`;
-          btn.style.marginTop = "0.5rem";
-
-          btn.addEventListener("click", () => {
-            const csvText = rowsToCsv(rows);
-            const baseName = file.name.replace(/\.csv$/i, "");
-            const outName = `${baseName}_edit.csv`;
-            downloadCsv(outName, csvText);
-          });
-
-          body.appendChild(btn);
-          perFileResults.appendChild(wrapper);
-        });
-      }
-
-      // 통합 결과 렌더링
-      if (!allRows.length) {
-        mergedResult.innerHTML = "<span class='muted'>통합할 데이터가 없습니다.</span>";
-      } else {
-        mergedResult.innerHTML = "";
-
-        const summaryP = document.createElement("p");
-        summaryP.innerHTML = `<span class="ok">모든 파일 변환 완료! 통합 행 수: ${allRows.length}</span>`;
-        mergedResult.appendChild(summaryP);
-
-        const tableContainerAll = document.createElement("div");
-        renderTable(tableContainerAll, allRows, 10);
-        mergedResult.appendChild(tableContainerAll);
-
-        const btnAll = document.createElement("button");
-        btnAll.className = "btn btn-primary";
-        btnAll.textContent = "모든 파일 통합 CSV 다운로드";
-        btnAll.style.marginTop = "0.5rem";
-
-        btnAll.addEventListener("click", () => {
-          const csvText = rowsToCsv(allRows);
-          downloadCsv("all_converted_merged.csv", csvText);
-        });
-
-        mergedResult.appendChild(btnAll);
-      }
-
-      convertStatus.innerHTML = "<span class='ok'>변환이 완료되었습니다.</span>";
-      convertButton.disabled = false;
+    out.push({
+      DateTime: dt,
+      Longitude: lon,
+      Latitude: lat,
+      Total_CH_power_dBm: total,
+      __source_file__: fname
     });
-  </script>
+  }
+  return out;
+}
+
+function rowsToCsv(rows) {
+  if (!rows.length) return "";
+  const header = ["DateTime","Longitude","Latitude","Total_CH_power_dBm","__source_file__"];
+  const lines = [header.join(",")];
+  rows.forEach(r => {
+    const line = header.map(h => r[h] ?? "").join(",");
+    lines.push(line);
+  });
+  return lines.join("\r\n");
+}
+
+function renderTable(div, rows, n=10) {
+  if (!rows.length) return div.textContent = "표시할 데이터 없음";
+
+  const header = ["DateTime","Longitude","Latitude","Total_CH_power_dBm","__source_file__"];
+  const table = document.createElement("table");
+  const thead = document.createElement("thead");
+  const trh = document.createElement("tr");
+
+  header.forEach(h=>{
+    const th = document.createElement("th");
+    th.textContent = h;
+    trh.appendChild(th);
+  });
+  thead.appendChild(trh);
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  for (let i=0; i < Math.min(n, rows.length); i++) {
+    const r = rows[i];
+    const tr = document.createElement("tr");
+    header.forEach(h=>{
+      const td = document.createElement("td");
+      td.textContent = r[h] ?? "";
+      tr.appendChild(td);
+    });
+    tbody.appendChild(tr);
+  }
+  table.appendChild(tbody);
+  div.innerHTML = "";
+  div.appendChild(table);
+}
+
+/* -------------------------
+   Leaflet 지도 렌더링
+--------------------------*/
+
+let map = null;
+let mapLayer = null;
+
+function renderMapFromRows(rows) {
+  const valid = rows.filter(r =>
+    typeof r.Latitude === "number" &&
+    typeof r.Longitude === "number" &&
+    !isNaN(r.Latitude) &&
+    !isNaN(r.Longitude)
+  );
+  if (!valid.length) {
+    document.getElementById("mapSection").style.display = "none";
+    return;
+  }
+
+  document.getElementById("mapSection").style.display = "block";
+
+  const avgLat = valid.reduce((a,b)=>a+b.Latitude,0) / valid.length;
+  const avgLon = valid.reduce((a,b)=>a+b.Longitude,0) / valid.length;
+
+  if (!map) {
+    map = L.map("map").setView([avgLat, avgLon], 15);
+
+    /* ✔ CARTO POSITRON 스타일 — 이미지와 가장 유사 */
+    L.tileLayer(
+      "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}.png",
+      {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://carto.com/">CARTO</a>'
+      }
+    ).addTo(map);
+
+    mapLayer = L.layerGroup().addTo(map);
+  } else {
+    map.setView([avgLat, avgLon], 15);
+    mapLayer.clearLayers();
+  }
+
+  const latlngs = [];
+
+  valid.forEach(p => {
+    const latlng = [p.Latitude, p.Longitude];
+    latlngs.push(latlng);
+
+    L.circleMarker(latlng, {
+      radius: 4,
+      color: "orange",
+      fillColor: "orange",
+      fillOpacity: 0.6,
+      weight: 1
+    }).addTo(mapLayer);
+  });
+
+  if (latlngs.length > 1) {
+    const bounds = L.latLngBounds(latlngs);
+    map.fitBounds(bounds.pad(0.1));
+  }
+}
+
+/* -------------------------
+   파일 업로드 및 변환
+--------------------------*/
+
+let selectedFiles = [];
+
+const fileInput = document.getElementById("fileInput");
+const fileInfo = document.getElementById("fileInfo");
+const fileList = document.getElementById("fileList");
+
+fileInput.addEventListener("change", () => {
+  selectedFiles = Array.from(fileInput.files || []);
+  fileList.innerHTML = "";
+  if (!selectedFiles.length) {
+    fileInfo.textContent = "선택된 파일이 없습니다.";
+    document.getElementById("convertButton").disabled = true;
+    return;
+  }
+
+  fileInfo.textContent = `${selectedFiles.length}개 파일 선택됨`;
+  selectedFiles.forEach(f=>{
+    const li = document.createElement("li");
+    li.textContent = `${f.name} (${(f.size/1024/1024).toFixed(2)} MB)`;
+    fileList.appendChild(li);
+  });
+
+  document.getElementById("convertButton").disabled = false;
+});
+
+document.getElementById("convertButton").addEventListener("click", async () => {
+
+  document.getElementById("convertStatus").textContent = "변환 중...";
+  const perFileResults = document.getElementById("perFileResults");
+  const mergedResult = document.getElementById("mergedResult");
+
+  perFileResults.innerHTML = "";
+  mergedResult.innerHTML = "";
+
+  const allRows = [];
+
+  for (const file of selectedFiles) {
+    const text = await file.text();
+    const rows = parseFileMakeSummary(text, file.name);
+    allRows.push(...rows);
+
+    const expander = document.createElement("div");
+    expander.className = "expander";
+
+    const header = document.createElement("div");
+    header.className = "expander-header";
+    header.innerHTML = `${file.name}`;
+    header.onclick = () => {
+      body.style.display = (body.style.display === "block" ? "none" : "block");
+    };
+
+    const body = document.createElement("div");
+    body.className = "expander-body";
+
+    const tableDiv = document.createElement("div");
+    renderTable(tableDiv, rows, 10);
+    body.appendChild(tableDiv);
+
+    const btn = document.createElement("button");
+    btn.className = "btn btn-secondary";
+    btn.textContent = "이 파일만 CSV 다운로드";
+    btn.onclick = () => {
+      const csv = rowsToCsv(rows);
+      const name = file.name.replace(/\.csv$/i, "") + "_edit.csv";
+      downloadCsv(name, csv);
+    };
+
+    body.appendChild(btn);
+
+    expander.appendChild(header);
+    expander.appendChild(body);
+    perFileResults.appendChild(expander);
+  }
+
+  if (!allRows.length) {
+    mergedResult.textContent = "통합 결과 없음";
+    return;
+  }
+
+  const d = document.createElement("div");
+  d.innerHTML = `<b>통합 행 수: ${allRows.length}</b>`;
+  mergedResult.appendChild(d);
+
+  const tableDiv = document.createElement("div");
+  renderTable(tableDiv, allRows, 10);
+  mergedResult.appendChild(tableDiv);
+
+  const allBtn = document.createElement("button");
+  allBtn.className = "btn btn-primary";
+  allBtn.textContent = "통합 CSV 다운로드";
+  allBtn.onclick = () => {
+    downloadCsv("all_converted_merged.csv", rowsToCsv(allRows));
+  };
+  mergedResult.appendChild(allBtn);
+
+  renderMapFromRows(allRows);
+
+  document.getElementById("convertStatus").textContent = "완료";
+});
+
+function downloadCsv(filename, content) {
+  const blob = new Blob([content], {type:"text/csv;charset=utf-8"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+</script>
+
 </body>
 </html>
-
-
-
-
