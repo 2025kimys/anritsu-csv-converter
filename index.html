@@ -180,9 +180,9 @@
       <div class="small"><b>GPS 기반 이동 경로 지도</b></div>
       <div id="map"></div>
       <div class="legend">
-        <span class="legend-label">-120 dBm (약한 신호)</span>
+        <span class="legend-label">-60 dBm</span>
         <div class="legend-bar"></div>
-        <span class="legend-label">-30 dBm (강한 신호)</span>
+        <span class="legend-label">0 dBm</span>
       </div>
       <div class="small muted">
         점을 클릭하면 해당 위치의 dBm / 시간 / 파일명을 볼 수 있습니다.
@@ -322,7 +322,7 @@ function getColorFromDbm(dbm) {
   if (dbm === null || dbm === undefined || Number.isNaN(dbm)) {
     return "#888888";
   }
-  const min = -55;  // 최소 dBm (필요시 조정)
+  const min = -60;  // 최소 dBm (필요시 조정)
   const max = 0;   // 최대 dBm
   const clamped = Math.max(min, Math.min(max, dbm));
   const ratio = (clamped - min) / (max - min); // 0 ~ 1
@@ -557,6 +557,7 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
 
 
