@@ -180,9 +180,9 @@
       <div class="small"><b>GPS 기반 이동 경로 지도</b></div>
       <div id="map"></div>
       <div class="legend">
-        <span id="legendMinLabel" class="legend-label">-60 dBm (약한 신호)</span>
+        <span id="legendMinLabel" class="legend-label"></span>
         <div class="legend-bar"></div>
-        <span id="legendMaxLabel" class="legend-label">0 dBm (강한 신호)</span>
+        <span id="legendMaxLabel" class="legend-label"></span>
       </div>
       <div class="small muted">
         점을 클릭하면 해당 위치의 dBm / 시간 / 파일명을 볼 수 있습니다.
@@ -346,6 +346,14 @@ let mapLayerGroup = null;
 
 function renderMapFromRows(rows) {
   const mapSection = document.getElementById("mapSection");
+  
+  const minLabel = document.getElementById("legendMinLabel");
+  const maxLabel = document.getElementById("legendMaxLabel");
+  
+  if (minLabel && maxLabel) {
+    minLabel.textContent = `${minDbm.toFixed(1)} dBm`;
+    maxLabel.textContent = `${maxDbm.toFixed(1)} dBm`;
+  }
 
   const points = rows.filter(r =>
     typeof r.Latitude === "number" &&
@@ -576,6 +584,7 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
 
 
