@@ -180,9 +180,9 @@
       <div class="small"><b>GPS 기반 이동 경로 지도</b></div>
       <div id="map"></div>
       <div class="legend">
-        <span class="legend-label">-60 dBm</span>
+        <span id="legendMinLabel" class="legend-label">-60 dBm (약한 신호)</span>
         <div class="legend-bar"></div>
-        <span class="legend-label">0 dBm</span>
+        <span id="legendMaxLabel" class="legend-label">0 dBm (강한 신호)</span>
       </div>
       <div class="small muted">
         점을 클릭하면 해당 위치의 dBm / 시간 / 파일명을 볼 수 있습니다.
@@ -318,20 +318,23 @@ function renderTable(container, rows, maxRows = 10) {
 --------------------------*/
 
 // 약한 신호(낮은 dBm) -> 초록, 강한 신호(높은 dBm) -> 빨강
-function getColorFromDbm(dbm) {
+// 약한 신호(더 작은 dBm) → 초록, 강한 신호(더 큰 dBm) → 빨강
+function getColorFromDbm(dbm, minDbm, maxDbm) {
   if (dbm === null || dbm === undefined || Number.isNaN(dbm)) {
     return "#888888";
   }
-  const min = -60;  // 최소 dBm (필요시 조정)
-  const max = 0;   // 최대 dBm
-  const clamped = Math.max(min, Math.min(max, dbm));
-  const ratio = (clamped - min) / (max - min); // 0 ~ 1
 
-  // ratio 0 → 초록(0,255,0), 1 → 빨강(255,0,0)
-  const r = Math.floor(255 * ratio);
-  const g = Math.floor(255 * (1 - ratio));
-  const b = 0;
-  return `rgb(${r}, ${g}, ${b})`;
+  if (minDbm === maxDbm) {
+    // 모든 값이 같을 때 0 나누기 방지
+    maxDbm = minDbm + 0.1;
+  }
+
+  // 0 → minDbm, 1 → maxDbm
+  const ratio = (dbm - minDbm) / (maxDbm - minDbm);
+
+  // HSL: 120°(초록) → 0°(빨강), 채도/명도는 고정 → 더 쨍한 색
+  const hue = (1 - ratio) * 120;          // 0~120
+  return `hsl(${hue}, 100%, 50%)`;
 }
 
 /* -------------------------
@@ -354,6 +357,22 @@ function renderMapFromRows(rows) {
   if (!points.length) {
     mapSection.style.display = "none";
     return;
+  }
+  // 유효한 dBm 값만 모아서 min/max 계산
+  const dbmValues = points
+    .map(p => p.Total_CH_power_dBm)
+    .filter(v => v !== null && v !== undefined && !Number.isNaN(v));
+  
+  let minDbm = Math.min(...dbmValues);
+  let maxDbm = Math.max(...dbmValues);
+  
+  // 보호: 모든 값이 똑같을 때
+  if (!isFinite(minDbm) || !isFinite(maxDbm)) {
+    minDbm = -60;
+    maxDbm = 0;
+  }
+  if (minDbm === maxDbm) {
+    maxDbm = minDbm + 0.1;
   }
 
   mapSection.style.display = "block";
@@ -385,7 +404,7 @@ function renderMapFromRows(rows) {
     const latlng = [p.Latitude, p.Longitude];
     latlngs.push(latlng);
 
-    const color = getColorFromDbm(p.Total_CH_power_dBm);
+    const color = getColorFromDbm(p.Total_CH_power_dBm, minDbm, maxDbm);
 
     L.circleMarker(latlng, {
       radius: 5,
@@ -557,6 +576,7 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
 
 
