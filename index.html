@@ -188,7 +188,7 @@
         점을 클릭하면 해당 위치의 dBm / 시간 / 파일명을 볼 수 있습니다.
       </div>
   </div>
-
+  </div>
 <script>
 /* -------------------------
    1. 파이썬 로직 → JS 포팅
@@ -346,14 +346,6 @@ let mapLayerGroup = null;
 
 function renderMapFromRows(rows) {
   const mapSection = document.getElementById("mapSection");
-  
-  const minLabel = document.getElementById("legendMinLabel");
-  const maxLabel = document.getElementById("legendMaxLabel");
-  
-  if (minLabel && maxLabel) {
-    minLabel.textContent = `${minDbm.toFixed(1)} dBm`;
-    maxLabel.textContent = `${maxDbm.toFixed(1)} dBm`;
-  }
 
   const points = rows.filter(r =>
     typeof r.Latitude === "number" &&
@@ -382,7 +374,14 @@ function renderMapFromRows(rows) {
   if (minDbm === maxDbm) {
     maxDbm = minDbm + 0.1;
   }
-
+  
+  const minLabel = document.getElementById("legendMinLabel");
+  const maxLabel = document.getElementById("legendMaxLabel");
+  
+  if (minLabel && maxLabel) {
+    minLabel.textContent = `${minDbm.toFixed(1)} dBm`;
+    maxLabel.textContent = `${maxDbm.toFixed(1)} dBm`;
+  }
   mapSection.style.display = "block";
 
   const avgLat = points.reduce((sum, r) => sum + r.Latitude, 0) / points.length;
@@ -584,6 +583,7 @@ function downloadCsv(filename, content) {
 
 </body>
 </html>
+
 
 
 
